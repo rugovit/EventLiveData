@@ -1,0 +1,2 @@
+include ':app', ':eventlivedata'
+rootProject.name='testing event live data'
