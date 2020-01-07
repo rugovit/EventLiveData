@@ -11,6 +11,8 @@ import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.OnLifecycleEvent;
+import androidx.lifecycle.ViewModel;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -20,20 +22,51 @@ import java.util.Map;
 import static androidx.lifecycle.Lifecycle.State.DESTROYED;
 import static androidx.lifecycle.Lifecycle.State.STARTED;
 
-//TODO test live data from fragment view model
 //TODO test onActive onInactive
-//TODO see if it is posible  to make  custum lifecycle observers so i can remove hacky observe in fragment method
-//TODO rename internal classes
-//TODO dodati dokumentaciju
 
 /**
- * Ne šalje event nakon subscribanja i ponovnog subscribanja
- * @param <T>
+ * DESIGNED TO SUPPORT  PROPAGATION OF  "ONE TIME" EVENTS ONLY WHEN THEY HAPPEN. UNLIKE REGULAR {@link LiveData} IT WILL NOT PROPAGATE "OLD" EVENTS TO SUBSCRIBERS THAT JUST BECOME ACTIVE.(BUTTON CLICK FROM OLD FRAGMENT  WILL NOT REACT IN NEW FRAGMENT  IF SUBSCRIBING TO SAME LIVE DATA)
+ * <p>
+ * CLASS ALSO SOLVES MULTIPLE SUBSCRIBERS BUG WHEN RETURNING BACK TO SAME FRAGMENT IN BACKSTACK  USING {@link EventLiveData#observeInOnStart(LifecycleOwner, Observer)} METHOD  THAT KEEPS OBSERVER ALIVE BETWEEN {@link Lifecycle.State#STARTED} AND {@link Lifecycle.Event#ON_STOP}
+ * ENSURING CORRECT REMOVAL OF OBSERVERS.
+ * <p>
+ * <p>
+ *
+ * EventLiveData is a data holder class that can be observed within a given lifecycle.
+ * This means that an {@link Observer} can be added in a pair with a {@link LifecycleOwner}, and
+ * this observer will be notified about modifications of the wrapped data only if the paired
+ * LifecycleOwner is in active state. LifecycleOwner is considered as active, if its state is
+ * {@link Lifecycle.State#STARTED} or {@link Lifecycle.State#RESUMED} in default configuration.
+ * <p>
+ * USING ADDITIONAL PARAMETERS WHILE SUBSCRIBING COULD BE MADE TO WORK WITH DIFFERENT START STATE AND REMOVED ON ONE OF THE EVENTS AFTER {@link Lifecycle.Event#ON_PAUSE}.
+ * <p>
+ * An observer added via
+ * {@link #observeForever(Observer)} is considered as always active and thus will be always notified
+ * about modifications. For those observers, you should manually call
+ * {@link #removeObserver(Observer)}.
+ *
+ * <p> An observer added with a Lifecycle will be automatically removed if the corresponding
+ * Lifecycle moves to {@link Lifecycle.State#DESTROYED} state OR ON SPECIFIC EVENT DEFINED WITH ADDITIONAL PARAMETER removeObserverEvent . This is especially useful for
+ * activities and fragments where they can safely observe LiveData and not worry about leaks:
+ * they will be instantly unsubscribed when they are destroyed.
+ *
+ * <p>
+ * In addition, LiveData has {@link LiveData#onActive()} and {@link LiveData#onInactive()} methods
+ * to get notified when number of active {@link Observer}s change between 0 and 1.
+ * This allows LiveData to release any heavy resources when it does not have any Observers that
+ * are actively observing.
+ * <p>
+ * This class is designed to hold individual data fields of {@link ViewModel},
+ * but can also be used for sharing data between different modules in your application
+ * in a decoupled fashion.
+ *
+ * @param <T> The type of data held by this instance
+ * @see ViewModel
  */
 public  class EventLiveData<T> extends LiveData<T> {
 
    // private final AtomicBoolean pending = new AtomicBoolean(false);
-    private final HashMap<Observer<? super T>, EventLiveData.ObserverWrapper> observers= new HashMap<>();
+    private final HashMap<Observer<? super T>, EventObserverWrapper> observers= new HashMap<>();
     private final Observer<T> internalObserver;
     int mActiveCount = 0;
 
@@ -42,9 +75,9 @@ public  class EventLiveData<T> extends LiveData<T> {
             @Override
             public void onChanged(T t) {
                 //if (EventLiveData.this.pending.compareAndSet(true, false)) {
-                Iterator<Map.Entry<Observer<? super T>,EventLiveData.ObserverWrapper>> iterator = EventLiveData.this.observers.entrySet().iterator();
+                Iterator<Map.Entry<Observer<? super T>, EventObserverWrapper>> iterator = EventLiveData.this.observers.entrySet().iterator();
                 while (iterator.hasNext()){
-                    EventLiveData.ObserverWrapper wrapper= iterator.next().getValue();
+                    EventObserverWrapper wrapper= iterator.next().getValue();
                     if(wrapper.shouldBeActive())
                         wrapper.getObserver().onChanged(t);
                 }
@@ -201,10 +234,10 @@ public  class EventLiveData<T> extends LiveData<T> {
             return;
         }
 
-        EventLiveData.LifecycleBoundObserver wrapper = new EventLiveData.LifecycleBoundObserver(owner, observer);
+        EventLifecycleBoundEventObserver wrapper = new EventLifecycleBoundEventObserver(owner, observer);
         wrapper.setMinimumStateForSendingEvent(minimumStateForSendingEvent);
         wrapper.setMaximumEventForRemovingEvent(removeObserverEvent);
-        EventLiveData.ObserverWrapper existing = wrapper;
+        EventObserverWrapper existing = wrapper;
         if(!observers.containsKey(observer))existing = observers.put(observer, wrapper);
         if (existing != null && !existing.isAttachedTo(owner)) {
             throw new IllegalArgumentException("Cannot add the same observer"
@@ -220,15 +253,19 @@ public  class EventLiveData<T> extends LiveData<T> {
         }
 
     }
+
+    /**
+     {@inheritDoc}
+     */
     @MainThread
     @Override
     public void observeForever(@NonNull Observer observer) {
         assertMainThread("observeForever");
         assertNotNull(observer, "observer");
-        EventLiveData.AlwaysActiveObserver wrapper = new EventLiveData.AlwaysActiveObserver(observer);
-        EventLiveData.ObserverWrapper existing = wrapper;
+        EventAlwaysActiveEventObserver wrapper = new EventAlwaysActiveEventObserver(observer);
+        EventObserverWrapper existing = wrapper;
         if(!observers.containsKey(observer))existing = observers.put(observer, wrapper);
-        if (existing != null && existing instanceof EventLiveData.LifecycleBoundObserver) {
+        if (existing != null && existing instanceof EventLiveData.EventLifecycleBoundEventObserver) {
             throw new IllegalArgumentException("Cannot add the same observer"
                     + " with different lifecycles");
         }
@@ -240,19 +277,25 @@ public  class EventLiveData<T> extends LiveData<T> {
         }
         wrapper.activeStateChanged(true);
     }
+    /**
+     {@inheritDoc}
+     */
     @Override
     public void removeObservers(@NonNull  LifecycleOwner owner) {
         assertMainThread("removeObservers");
         assertNotNull(owner, "owner");
-        Iterator<Map.Entry<Observer<? super T>,EventLiveData.ObserverWrapper>> iterator = EventLiveData.this.observers.entrySet().iterator();
+        Iterator<Map.Entry<Observer<? super T>, EventObserverWrapper>> iterator = EventLiveData.this.observers.entrySet().iterator();
         while (iterator.hasNext()){
-            Map.Entry<Observer<? super T>,EventLiveData.ObserverWrapper> entry=iterator.next();
-            if(entry.getValue() instanceof EventLiveData.LifecycleBoundObserver){
-                EventLiveData.LifecycleBoundObserver lifecycleBoundObserver=(EventLiveData.LifecycleBoundObserver) entry.getValue();
-                if(lifecycleBoundObserver.isAttachedTo(owner))this.observers.remove(entry.getKey());
+            Map.Entry<Observer<? super T>, EventObserverWrapper> entry=iterator.next();
+            if(entry.getValue() instanceof EventLiveData.EventLifecycleBoundEventObserver){
+                EventLifecycleBoundEventObserver eventLifecycleBoundObserver =(EventLifecycleBoundEventObserver) entry.getValue();
+                if(eventLifecycleBoundObserver.isAttachedTo(owner))this.observers.remove(entry.getKey());
             }
         }
     }
+    /**
+     {@inheritDoc}
+     */
     @Override
     public void removeObserver(@NonNull  Observer observer) {
         assertMainThread("removeObserver");
@@ -261,32 +304,20 @@ public  class EventLiveData<T> extends LiveData<T> {
 
      }
     /**
-     * Called when the number of active observers change to 1 from 0.
-     * <p>
-     * This callback can be used to know that this LiveData is being used thus should be kept
-     * up to date.
+     {@inheritDoc}
      */
     protected void onActive() {
 
     }
-
     /**
-     * Called when the number of active observers change from 1 to 0.
-     * <p>
-     * This does not mean that there are no observers left, there may still be observers but their
-     * lifecycle states aren't {@link Lifecycle.State#STARTED} or {@link Lifecycle.State#RESUMED}
-     * (like an Activity in the back stack).
-     * <p>
-     * You can check if there are observers via {@link #hasObservers()}.
+     {@inheritDoc}
      */
     protected void onInactive() {
 
     }
 
     /**
-     * Returns true if this LiveData has observers.
-     *
-     * @return true if this LiveData has observers
+     {@inheritDoc}
      */
     @SuppressWarnings("WeakerAccess")
     public boolean hasObservers() {
@@ -294,20 +325,18 @@ public  class EventLiveData<T> extends LiveData<T> {
     }
 
     /**
-     * Returns true if this LiveData has active observers.
-     *
-     * @return true if this LiveData has active observers
+     {@inheritDoc}
      */
     @SuppressWarnings("WeakerAccess")
     public boolean hasActiveObservers() {
         return mActiveCount > 0;
     }
-    class LifecycleBoundObserver extends EventLiveData.ObserverWrapper implements LifecycleObserver {
+    class EventLifecycleBoundEventObserver extends EventObserverWrapper implements LifecycleObserver {
         @NonNull
        private final LifecycleOwner mOwner;
         private Lifecycle.State MINIMUM_STATE_FOR_SENDING_EVENT= STARTED;
         private Lifecycle.Event MAXIMUM_EVENT_FOR_REMOVING_EVENT= null;
-        LifecycleBoundObserver(@NonNull LifecycleOwner owner, Observer<? super T> observer) {
+        EventLifecycleBoundEventObserver(@NonNull LifecycleOwner owner, Observer<? super T> observer) {
             super(observer);
             mOwner = owner;
         }
@@ -354,11 +383,11 @@ public  class EventLiveData<T> extends LiveData<T> {
         }
     }
 
-    private abstract class ObserverWrapper {
+    private abstract class EventObserverWrapper {
         protected final Observer<? super T> mObserver;
         boolean mActive;
 
-        ObserverWrapper(Observer<? super T> observer) {
+        EventObserverWrapper(Observer<? super T> observer) {
             mObserver = observer;
         }
 
@@ -399,9 +428,9 @@ public  class EventLiveData<T> extends LiveData<T> {
 
 
 
-    private class AlwaysActiveObserver extends EventLiveData.ObserverWrapper {
+    private class EventAlwaysActiveEventObserver extends EventObserverWrapper {
 
-        AlwaysActiveObserver(Observer<? super T> observer) {
+        EventAlwaysActiveEventObserver(Observer<? super T> observer) {
             super(observer);
         }
 
