@@ -65,7 +65,6 @@ import static androidx.lifecycle.Lifecycle.State.STARTED;
  */
 public  class EventLiveData<T> extends LiveData<T> {
 
-   // private final AtomicBoolean pending = new AtomicBoolean(false);
     private final HashMap<Observer<? super T>, EventObserverWrapper> observers= new HashMap<>();
     private final Observer<T> internalObserver;
     int mActiveCount = 0;
@@ -74,14 +73,12 @@ public  class EventLiveData<T> extends LiveData<T> {
         this.internalObserver =  (new Observer<T>() {
             @Override
             public void onChanged(T t) {
-                //if (EventLiveData.this.pending.compareAndSet(true, false)) {
                 Iterator<Map.Entry<Observer<? super T>, EventObserverWrapper>> iterator = EventLiveData.this.observers.entrySet().iterator();
                 while (iterator.hasNext()){
                     EventObserverWrapper wrapper= iterator.next().getValue();
                     if(wrapper.shouldBeActive())
                         wrapper.getObserver().onChanged(t);
                 }
-                //}
             }
         });
     }
