@@ -65,7 +65,7 @@ public  class EventLiveData<T> extends LiveData<T> {
 
     private final HashMap<Observer<? super T>, EventObserverWrapper> observers= new HashMap<>();
     private final Observer<T> internalObserver;
-    int mActiveCount = 0;
+    private int mActiveCount = 0;
 
     public EventLiveData() {
         this.internalObserver =  (new Observer<T>() {
@@ -420,9 +420,6 @@ public  class EventLiveData<T> extends LiveData<T> {
             if (EventLiveData.this.mActiveCount == 0 && !mActive) {
                 onInactive();
             }
-            //if (mActive) {  //calls observer
-            //    dispatchingValue(this);
-            // }
         }
     }
 
