@@ -22,8 +22,6 @@ import java.util.Map;
 import static androidx.lifecycle.Lifecycle.State.DESTROYED;
 import static androidx.lifecycle.Lifecycle.State.STARTED;
 
-//TODO test onActive onInactive
-
 /**
  * DESIGNED TO SUPPORT  PROPAGATION OF  "ONE TIME" EVENTS ONLY WHEN THEY HAPPEN. UNLIKE REGULAR {@link LiveData} IT WILL NOT PROPAGATE "OLD" EVENTS TO SUBSCRIBERS THAT JUST BECOME ACTIVE.(BUTTON CLICK FROM OLD FRAGMENT  WILL NOT REACT IN NEW FRAGMENT  IF SUBSCRIBING TO SAME LIVE DATA)
  * <p>
@@ -31,7 +29,7 @@ import static androidx.lifecycle.Lifecycle.State.STARTED;
  * ENSURING CORRECT REMOVAL OF OBSERVERS.
  * <p>
  * <p>
- *
+ * <p>
  * EventLiveData is a data holder class that can be observed within a given lifecycle.
  * This means that an {@link Observer} can be added in a pair with a {@link LifecycleOwner}, and
  * this observer will be notified about modifications of the wrapped data only if the paired
@@ -47,13 +45,13 @@ import static androidx.lifecycle.Lifecycle.State.STARTED;
  *
  * <p> An observer added with a Lifecycle will be automatically removed if the corresponding
  * Lifecycle moves to {@link Lifecycle.State#DESTROYED} state OR ON SPECIFIC EVENT DEFINED WITH ADDITIONAL PARAMETER removeObserverEvent . This is especially useful for
- * activities and fragments where they can safely observe LiveData and not worry about leaks:
+ * activities and fragments where they can safely observe EventLiveData and not worry about leaks:
  * they will be instantly unsubscribed when they are destroyed.
  *
  * <p>
- * In addition, LiveData has {@link LiveData#onActive()} and {@link LiveData#onInactive()} methods
+ * In addition, EventLiveData has {@link EventLiveData#onActiveEvent()} and {@link EventLiveData#onInactive()} methods
  * to get notified when number of active {@link Observer}s change between 0 and 1.
- * This allows LiveData to release any heavy resources when it does not have any Observers that
+ * This allows EventLiveData to release any heavy resources when it does not have any Observers that
  * are actively observing.
  * <p>
  * This class is designed to hold individual data fields of {@link ViewModel},
@@ -83,17 +81,17 @@ public  class EventLiveData<T> extends LiveData<T> {
         });
     }
     private void internalObserve(){
-         super.observeForever(this.internalObserver);
+        super.observeForever(this.internalObserver);
 
     }
 
     /**
-     * Acts as regular  observer method witch it overrides with exception that events are only receded when they are set with {@link androidx.lifecycle.MutableLiveData#setValue(Object)} or {@link androidx.lifecycle.MutableLiveData#postValue(Object)}
+     * Acts as regular  observer method witch it overrides with exception that events are only receded when they are set with {@link EventLiveData#setValue(Object)} or {@link EventLiveData#postValue(Object)}
      * <p> If Observer becomes active after EventLiveData is set to some value it will not call Observer
      * <p>
      * <p>
      * Adds the given observer to the observers list within the lifespan of the given
-     * owner. The events are dispatched on the main thread. If LiveData already has data
+     * owner. The events are dispatched on the main thread. If EventLiveData already has data
      * set, it will be delivered to the observer.
      * <p>
      * The observer will only receive events if the owner is in {@link Lifecycle.State#STARTED}
@@ -105,15 +103,15 @@ public  class EventLiveData<T> extends LiveData<T> {
      * When data changes while the {@code owner} is not active, it will not receive any updates.
      * If it becomes active again, IT WILL NOT RECEIVE (!) the last available data.
      * <p>
-     * LiveData keeps a strong reference to the observer and the owner as long as the
-     * given LifecycleOwner is not destroyed. When it is destroyed, LiveData removes references to
+     * EventLiveData keeps a strong reference to the observer and the owner as long as the
+     * given LifecycleOwner is not destroyed. When it is destroyed, EventLiveData removes references to
      * the observer &amp; the owner.
      * <p>
-     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, LiveData
+     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, EventLiveData
      * ignores the call.
      * <p>
      * If the given owner, observer tuple is already in the list, the call is ignored.
-     * If the observer is already in the list with another owner, LiveData throws an
+     * If the observer is already in the list with another owner, EventLiveData throws an
      * {@link IllegalArgumentException}.
      *
      * @param owner    The LifecycleOwner which controls the observer
@@ -121,7 +119,7 @@ public  class EventLiveData<T> extends LiveData<T> {
      */
     @MainThread
     @Override
-    public void observe(@NonNull LifecycleOwner owner, @NonNull  Observer observer) {
+    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer observer) {
         observe(owner, observer,STARTED,null);
     }
     /**
@@ -130,7 +128,7 @@ public  class EventLiveData<T> extends LiveData<T> {
      * <p>
      * <p>
      * Adds the given observer to the observers list within the lifespan of the given
-     * owner. The events are dispatched on the main thread. If LiveData already has data
+     * owner. The events are dispatched on the main thread. If EventLiveData already has data
      * set, it will be delivered to the observer.
      * <p>
      * The observer will only receive events if the owner is in minimumStateForSendingEvent state (active).
@@ -141,36 +139,36 @@ public  class EventLiveData<T> extends LiveData<T> {
      * When data changes while the {@code owner} is not active, it will not receive any updates.
      * If it becomes active again, IT WILL NOT RECEIVE (!) the last available data.
      * <p>
-     * LiveData keeps a strong reference to the observer and the owner as long as the
-     * given LifecycleOwner is not destroyed. When it is destroyed, LiveData removes references to
+     * EventLiveData keeps a strong reference to the observer and the owner as long as the
+     * given LifecycleOwner is not destroyed. When it is destroyed, EventLiveData removes references to
      * the observer &amp; the owner.
      * <p>
-     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, LiveData
+     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, EventLiveData
      * ignores the call.
      * <p>
      * If the given owner, observer tuple is already in the list, the call is ignored.
-     * If the observer is already in the list with another owner, LiveData throws an
+     * If the observer is already in the list with another owner, EventLiveData throws an
      * {@link IllegalArgumentException}.
      *
      * @param owner    The LifecycleOwner which controls the observer
      * @param observer The observer that will receive the events
-     * @param minimumStateForSendingEvent minimum lifecycle state in what owner has to be for Observer to be updated (Default state for regular LiveData is {@link Lifecycle.State#STARTED} )
+     * @param minimumStateForSendingEvent minimum lifecycle state in what owner has to be for Observer to be updated (Default state for regular EventLiveData is {@link Lifecycle.State#STARTED} )
      */
     @MainThread
-    public void observe(@NonNull LifecycleOwner owner, @NonNull  Observer observer,@NonNull Lifecycle.State minimumStateForSendingEvent) {
+    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer observer, @NonNull Lifecycle.State minimumStateForSendingEvent) {
         observe(owner, observer,minimumStateForSendingEvent,null);
     }
 
-    /** Same as calling {@link MutableEventLiveData} {@link MutableEventLiveData#observe( LifecycleOwner owner,  Observer observer, Lifecycle.State minimumStateForSendingEvent,Lifecycle.Event removeObserverEvent) observe(LifecycleOwner owner,  Observer observer, Lifecycle.State minimumStateForSendingEvent,Lifecycle.Event removeObserverEvent)}
+    /** Same as calling {@link MutableEventLiveData} {@link MutableEventLiveData#observe( LifecycleOwner owner, Observer observer, Lifecycle.State minimumStateForSendingEvent,Lifecycle.Event removeObserverEvent) observe(LifecycleOwner owner,  Observer observer, Lifecycle.State minimumStateForSendingEvent,Lifecycle.Event removeObserverEvent)}
      *<p> With parameters:
      *<p> minimumStateForSendingEvent= {@link Lifecycle.State#STARTED}
      *<p> removeObserverEvent={@link Lifecycle.Event#ON_STOP}
-     * Should be called in  {@link Fragment#onStart()} method. Use to fix strange behavior  of LiveData when going back  to previous  Fragment  in backstack
+     * Should be called in  {@link Fragment#onStart()} method. Use to fix strange behavior  of EventLiveData when going back  to previous  Fragment  in backstack
      * @param owner    The LifecycleOwner which controls the observer
      * @param observer The observer that will receive the events
      */
     @MainThread
-    public void observeInOnStart(@NonNull LifecycleOwner owner, @NonNull  Observer observer) {
+    public void observeInOnStart(@NonNull LifecycleOwner owner, @NonNull Observer observer) {
         observe(owner, observer,STARTED, Lifecycle.Event.ON_STOP);
     }
     /**
@@ -179,7 +177,7 @@ public  class EventLiveData<T> extends LiveData<T> {
      * <p>
      * <p>
      * Adds the given observer to the observers list within the lifespan of the given
-     * owner. The events are dispatched on the main thread. If LiveData already has data
+     * owner. The events are dispatched on the main thread. If EventLiveData already has data
      * set, it will be delivered to the observer.
      * <p>
      * The observer will only receive events if the owner is in minimumStateForSendingEvent state (active).
@@ -191,24 +189,24 @@ public  class EventLiveData<T> extends LiveData<T> {
      * When data changes while the {@code owner} is not active, it will not receive any updates.
      * If it becomes active again, IT WILL NOT RECEIVE (!) the last available data.
      * <p>
-     * LiveData keeps a strong reference to the observer and the owner as long as the
-     * given LifecycleOwner is not destroyed. When it is destroyed, LiveData removes references to
+     * EventLiveData keeps a strong reference to the observer and the owner as long as the
+     * given LifecycleOwner is not destroyed. When it is destroyed, EventLiveData removes references to
      * the observer &amp; the owner.
      * <p>
-     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, LiveData
+     * If the given owner is already in {@link Lifecycle.State#DESTROYED} state, EventLiveData
      * ignores the call.
      * <p>
      * If the given owner, observer tuple is already in the list, the call is ignored.
-     * If the observer is already in the list with another owner, LiveData throws an
+     * If the observer is already in the list with another owner, EventLiveData throws an
      * {@link IllegalArgumentException}.
      *
      * @param owner    The LifecycleOwner which controls the observer
      * @param observer The observer that will receive the events
-     * @param minimumStateForSendingEvent minimum lifecycle state in what owner has to be for Observer to be updated (Default state for regular LiveData is {@link Lifecycle.State#STARTED} )
+     * @param minimumStateForSendingEvent minimum lifecycle state in what owner has to be for Observer to be updated (Default state for regular EventLiveData is {@link Lifecycle.State#STARTED} )
      * @param removeObserverEvent maximum {@link Lifecycle.Event} that triggers removal of Event
      */
     @MainThread
-    public void observe(@NonNull LifecycleOwner owner, @NonNull  Observer observer,@NonNull Lifecycle.State minimumStateForSendingEvent,Lifecycle.Event removeObserverEvent) {
+    public void observe(@NonNull LifecycleOwner owner, @NonNull Observer observer, @NonNull Lifecycle.State minimumStateForSendingEvent, Lifecycle.Event removeObserverEvent) {
         assertMainThread("observe");
         assertNotNull(owner, "owner");
         assertNotNull(observer, "observer");
@@ -294,18 +292,24 @@ public  class EventLiveData<T> extends LiveData<T> {
      {@inheritDoc}
      */
     @Override
-    public void removeObserver(@NonNull  Observer observer) {
+    public void removeObserver(@NonNull Observer observer) {
         assertMainThread("removeObserver");
         assertNotNull(observer, "observer");
         this.observers.remove(observer);
 
-     }
-    /**
+    }
+    /** Final because OnActive is being used by superclass, override  {@link EventLiveData#onActiveEvent()} instead
+     *<p>
      {@inheritDoc}
      */
-    protected void onActive() {
-
-    }
+    final protected void onActive() {}
+    /**
+     * Called when the number of active observers change to 1 from 0.
+     * <p>
+     * This callback can be used to know that this EventLiveData is being used thus should be kept
+     * up to date.
+     */
+    protected void onActiveEvent() {}
     /**
      {@inheritDoc}
      */
@@ -330,7 +334,7 @@ public  class EventLiveData<T> extends LiveData<T> {
     }
     class EventLifecycleBoundEventObserver extends EventObserverWrapper implements LifecycleObserver {
         @NonNull
-       private final LifecycleOwner mOwner;
+        private final LifecycleOwner mOwner;
         private Lifecycle.State MINIMUM_STATE_FOR_SENDING_EVENT= STARTED;
         private Lifecycle.Event MAXIMUM_EVENT_FOR_REMOVING_EVENT= null;
         EventLifecycleBoundEventObserver(@NonNull LifecycleOwner owner, Observer<? super T> observer) {
@@ -411,7 +415,7 @@ public  class EventLiveData<T> extends LiveData<T> {
             boolean wasInactive = EventLiveData.this.mActiveCount == 0;
             EventLiveData.this.mActiveCount += mActive ? 1 : -1;
             if (wasInactive && mActive) {
-                onActive();
+                onActiveEvent();
             }
             if (EventLiveData.this.mActiveCount == 0 && !mActive) {
                 onInactive();
@@ -451,7 +455,7 @@ public  class EventLiveData<T> extends LiveData<T> {
     }
     private void assertMaximumEvent(@NonNull Lifecycle.Event maximumEventForRemovingEvent){
         if(maximumEventForRemovingEvent== Lifecycle.Event.ON_START||maximumEventForRemovingEvent== Lifecycle.Event.ON_CREATE
-        ||maximumEventForRemovingEvent== Lifecycle.Event.ON_RESUME){
+                ||maximumEventForRemovingEvent== Lifecycle.Event.ON_RESUME){
             StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
             StackTraceElement caller = stackTraceElements[3];
             String className = caller.getClassName();
@@ -494,7 +498,7 @@ public  class EventLiveData<T> extends LiveData<T> {
         return sanitizeStackTrace(throwable, this.getClass().getName());
     }
 
-     <T extends Throwable> T sanitizeStackTrace(T throwable, String classNameToDrop) {
+    <T extends Throwable> T sanitizeStackTrace(T throwable, String classNameToDrop) {
         StackTraceElement[] stackTrace = throwable.getStackTrace();
         int size = stackTrace.length;
 
