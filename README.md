@@ -6,7 +6,7 @@
 This is extension of LiveData that allows propagation of events  that are consumed only once to multiple observers.
 
 
-## Communication
+# Communication
 
  Find me here :
 
@@ -26,7 +26,7 @@ implementation 'com.rugovit.eventlivedata:eventlivedata:1.0'
 * EventLiveData: [ ![Download](https://api.bintray.com/packages/rugovit/android/eventlivedata/images/download.svg) ](https://bintray.com/rugovit/android/eventlivedata/_latestVersion)
 
 
-# Sample usage
+# Usage
 
 A sample project which provides runnable code examples that demonstrate uses of EventLiveData is available in the `EventLiveData/app/` folder of this repository.
 ## Basic usage
@@ -93,7 +93,7 @@ Observer will not receive any events. That is because  STARTED state  will chang
 
 
 
-## Bugs and Feedback
+# Bugs and Feedback
 
 For bugs, feature requests, and discussion please use [GitHub Issues][issues].
 
