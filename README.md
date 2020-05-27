@@ -99,7 +99,7 @@ For bugs, feature requests, and discussion please use [GitHub Issues][issues].
 
 ## LICENSE
 
-    Copyright 2015 The RxAndroid authors
+    Copyright 2020 Darko Martinović
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
